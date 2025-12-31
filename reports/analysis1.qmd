@@ -1,0 +1,312 @@
+---
+title: "Lupus Nephritis Analysis"
+author: "NTG Lupus Study Team"
+date: today
+format: html
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(gtsummary)
+
+theme_gtsummary_compact()
+```
+
+```{r}
+#| label: data-ingestion
+
+d <- readRDS("../data/stage1.rds")
+```
+
+## Table 1: Demographics
+
+```{r}
+#| label: tbl-demographics
+
+d |>
+  # select(age_at_biopsy, female_gender, indigenous_status) |>
+  select(age_at_biopsy, female_gender, indigenous_status) |>
+  tbl_summary(
+    label = list(
+      age_at_biopsy ~ "Age at biopsy (years)",
+      female_gender ~ "Female gender",
+      indigenous_status ~ "Indigenous Status"
+    ),
+    statistic = list(
+      all_continuous() ~ "{median} ({p25}, {p75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(
+      all_continuous() ~ 1,
+      all_categorical() ~ c(0, 1)
+    ),
+    missing = "no"
+  ) |>
+  bold_labels()
+```
+
+## Table 2: Clinical Findings at Presentation
+
+```{r}
+#| label: tbl-clinical-findings
+
+d |>
+  select(
+    u_acr_category,
+    haematuria,
+    ckd_stage_dd,
+    hb,
+    plt,
+    hb_a1c_percent_at_biopsy
+  ) |>
+  tbl_summary(
+    label = list(
+      u_acr_category ~ "UACR Category",
+      haematuria ~ "Haematuria",
+      ckd_stage_dd ~ "CKD Stage",
+      hb ~ "Hemoglobin (g/L)",
+      plt ~ "Platelets (×10⁹/L)",
+      hb_a1c_percent_at_biopsy ~ "HbA1c (%)"
+    ),
+    statistic = list(
+      all_continuous() ~ "{median} ({p25}, {p75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(
+      all_continuous() ~ 1,
+      all_categorical() ~ c(0, 1)
+    ),
+    missing = "no"
+  ) |>
+  modify_caption("**Table 2. Clinical Findings at Presentation**") |>
+  bold_labels()
+```
+
+## Table 3: Serological Markers
+
+```{r}
+#| label: tbl-serology
+
+d |>
+  select(
+    ana_dd,
+    anti_dsdna_positive,
+    c3_low,
+    c4_low,
+    anti_b2_glycoprotein,
+    anti_cardiolipin,
+    lupus_anticoagulant_positive
+  ) |>
+  mutate(
+    across(c(ana_dd), ~na_if(.x, "NC"))
+  ) |>
+  tbl_summary(
+    label = list(
+      ana_dd ~ "ANA",
+      anti_dsdna_positive ~ "Anti-dsDNA Positive",
+      c3_low ~ "Low C3",
+      c4_low ~ "Low C4",
+      anti_b2_glycoprotein ~ "Anti-β2 Glycoprotein Positive",
+      anti_cardiolipin ~ "Anti-Cardiolipin Positive",
+      lupus_anticoagulant_positive ~ "Lupus Anticoagulant Positive"
+    ),
+    statistic = list(
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(
+      all_categorical() ~ c(0, 1)
+    ),
+    missing = "no"
+  ) |>
+  modify_caption("**Table 3. Serological Markers**") |>
+  bold_labels()
+```
+
+## Table 4: ISN/RPS Classification
+
+```{r}
+#| label: tbl-isn-rps
+
+# Original classification
+tbl_original <- d |>
+  select(isn_rps_class) |>
+  tbl_summary(
+    label = list(isn_rps_class ~ "ISN/RPS Class (Original)"),
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    digits = list(all_categorical() ~ c(0, 1)),
+    missing = "no"
+  )
+
+# Individual class presence
+tbl_classes <- d |>
+  select(
+    isn_class_I,
+    isn_class_II,
+    isn_class_III,
+    isn_class_IV,
+    isn_class_V,
+    isn_class_VI
+  ) |>
+  mutate(
+    across(everything(), ~factor(.x, levels = c(0, 1), labels = c("Absent", "Present")))
+  ) |>
+  tbl_summary(
+    label = list(
+      isn_class_I ~ "Class I",
+      isn_class_II ~ "Class II",
+      isn_class_III ~ "Class III",
+      isn_class_IV ~ "Class IV",
+      isn_class_V ~ "Class V",
+      isn_class_VI ~ "Class VI"
+    ),
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    digits = list(all_categorical() ~ c(0, 1)),
+    missing = "no"
+  )
+
+# Clinical groupings
+tbl_groupings <- d |>
+  select(
+    isn_pure_class,
+    isn_proliferative,
+    isn_membranous
+  ) |>
+  mutate(
+    isn_proliferative = factor(isn_proliferative, levels = c(0, 1), labels = c("No", "Yes")),
+    isn_membranous = factor(isn_membranous, levels = c(0, 1), labels = c("No", "Yes"))
+  ) |>
+  tbl_summary(
+    label = list(
+      isn_pure_class ~ "Pure vs Mixed",
+      isn_proliferative ~ "Proliferative (III/IV)",
+      isn_membranous ~ "Membranous (V)"
+    ),
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    digits = list(all_categorical() ~ c(0, 1)),
+    missing = "no"
+  )
+
+# Combine tables
+tbl_merge(
+  list(tbl_original, tbl_classes, tbl_groupings),
+  tab_spanner = c("**Original Classification**", "**Individual Classes**", "**Clinical Groupings**")
+) |>
+  modify_caption("**Table 4. ISN/RPS Histological Classification**") |>
+  bold_labels()
+```
+
+## Table 5: Outcomes
+
+```{r}
+#| label: tbl-outcomes
+
+d |>
+  select(
+    permanent_rrt,
+    mortality_dd,
+    transplant
+  ) |>
+  mutate(
+    permanent_rrt = factor(permanent_rrt, levels = c("N", "Y"), labels = c("No", "Yes")),
+    mortality_dd = factor(mortality_dd,
+                         levels = c(1, 2, 3),
+                         labels = c("Alive", "Dead", "Unable to confirm")),
+    transplant = case_when(
+      transplant == "Y" ~ "Yes",
+      transplant == "N" ~ "No",
+      transplant == "NC" ~ NA_character_,
+      TRUE ~ NA_character_
+    ) |> factor(levels = c("No", "Yes"))
+  ) |>
+  tbl_summary(
+    label = list(
+      permanent_rrt ~ "Permanent RRT",
+      mortality_dd ~ "Mortality",
+      transplant ~ "Transplant"
+    ),
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    digits = list(all_categorical() ~ c(0, 1)),
+    missing = "no"
+  ) |>
+  modify_caption("**Table 5. Clinical Outcomes**") |>
+  bold_labels()
+```
+
+## Figure 1: ISN/RPS Class Co-occurrence Heatmap
+
+```{r}
+#| label: fig-isn-heatmap
+#| fig-width: 8
+#| fig-height: 6
+
+# Create co-occurrence matrix
+isn_matrix <- d |>
+  select(isn_class_I, isn_class_II, isn_class_III, isn_class_IV, isn_class_V, isn_class_VI) |>
+  as.matrix()
+
+# Calculate co-occurrence (how often classes appear together)
+cooccur <- t(isn_matrix) %*% isn_matrix
+
+# Remove diagonal (self-occurrence has no meaning)
+diag(cooccur) <- NA
+
+# Keep only lower triangle (matrix is symmetric)
+cooccur[upper.tri(cooccur)] <- NA
+
+# Convert to data frame for plotting
+cooccur_df <- as.data.frame(cooccur)
+cooccur_df$Class1 <- rownames(cooccur_df)
+
+# Reshape to long format
+library(tidyr)
+cooccur_long <- cooccur_df |>
+  pivot_longer(cols = -Class1, names_to = "Class2", values_to = "Count") |>
+  filter(!is.na(Count)) |>
+  mutate(
+    Class1 = factor(Class1, levels = paste0("isn_class_", c("I", "II", "III", "IV", "V", "VI"))),
+    Class2 = factor(Class2, levels = paste0("isn_class_", c("I", "II", "III", "IV", "V", "VI"))),
+    Class1 = recode(Class1,
+                   "isn_class_I" = "Class I",
+                   "isn_class_II" = "Class II",
+                   "isn_class_III" = "Class III",
+                   "isn_class_IV" = "Class IV",
+                   "isn_class_V" = "Class V",
+                   "isn_class_VI" = "Class VI"),
+    Class2 = recode(Class2,
+                   "isn_class_I" = "Class I",
+                   "isn_class_II" = "Class II",
+                   "isn_class_III" = "Class III",
+                   "isn_class_IV" = "Class IV",
+                   "isn_class_V" = "Class V",
+                   "isn_class_VI" = "Class VI")
+  )
+
+# Create heatmap
+ggplot(cooccur_long, aes(x = Class1, y = Class2, fill = Count)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = Count), color = "white", size = 5, fontface = "bold") +
+  scale_fill_gradient(low = "#2c7bb6", high = "#d7191c", name = "Co-occurrence\nCount") +
+  labs(
+    title = "ISN/RPS Class Co-occurrence Matrix",
+    subtitle = "Number of patients with both classes simultaneously",
+    x = "",
+    y = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10, color = "gray30"),
+    panel.grid = element_blank(),
+    legend.position = "right"
+  )
+```
+
+**Figure 1**: Heatmap showing co-occurrence patterns between ISN/RPS classes. Each cell shows how many patients have both classes simultaneously (e.g., "3 and 5" shows in the III-V cell). Lower triangle only shown as the matrix is symmetric.
+

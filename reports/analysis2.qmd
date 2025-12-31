@@ -1,0 +1,388 @@
+---
+title: "Predictors of Permanent RRT in Lupus Nephritis"
+author: "NTG Lupus Study Team"
+date: today
+format: html
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(gtsummary)
+
+theme_gtsummary_compact()
+```
+
+```{r}
+#| label: data-prep
+
+# Load data
+d <- readRDS("../data/stage1.rds")
+
+# Prepare variables for regression
+d_reg <- d |>
+  mutate(
+    # Outcome: Binary RRT variable
+    rrt_outcome = factor(permanent_rrt, levels = c("N", "Y"), labels = c("No", "Yes")),
+
+    # CKD stage: Ordinal (could also try as categorical)
+    ckd_stage = as.numeric(ckd_stage_dd),
+    ckd_stage_cat = factor(ckd_stage_dd,
+                           levels = c("1", "2", "3", "4", "5"),
+                           labels = c("Stage 1", "Stage 2", "Stage 3", "Stage 4", "Stage 5")),
+
+    # CKD stage dichotomized (1-2 vs 3-5)
+    ckd_advanced = factor(
+      ifelse(ckd_stage >= 3, "CKD 3-5", "CKD 1-2"),
+      levels = c("CKD 1-2", "CKD 3-5")
+    ),
+
+    # Indigenous status
+    indigenous = factor(indigenous_status,
+                       levels = c("Non-Indigenous", "Indigenous")),
+
+    # UACR category
+    uacr_cat = factor(u_acr_category,
+                      levels = c("Normal", "Microalbuminuria", "Macroalbuminuria", "Nephrotic range")),
+
+    # ISN/RPS classifications
+    proliferative = factor(isn_proliferative,
+                          levels = c(0, 1),
+                          labels = c("No", "Yes")),
+    pure_vs_mixed = factor(isn_pure_class,
+                          levels = c("Pure", "Mixed")),
+    class_IV = factor(isn_class_IV,
+                     levels = c(0, 1),
+                     labels = c("No", "Yes")),
+    class_V = factor(isn_class_V,
+                    levels = c(0, 1),
+                    labels = c("No", "Yes")),
+
+    # Hemoglobin (continuous)
+    hemoglobin = hb,
+
+    # Anemia (< 120 g/L)
+    anemia = factor(ifelse(hb < 120, "Yes", "No"),
+                   levels = c("No", "Yes")),
+
+    # Platelets
+    platelets = plt,
+
+    # Complement levels (using logical variables from ETL)
+    c3_low_factor = factor(ifelse(c3_low == TRUE, "Low", "Normal/High"),
+                          levels = c("Normal/High", "Low")),
+    c4_low_factor = factor(ifelse(c4_low == TRUE, "Low", "Normal/High"),
+                          levels = c("Normal/High", "Low")),
+
+    # Anti-dsDNA (using logical variable from ETL)
+    dsdna_positive = factor(ifelse(anti_dsdna_positive == TRUE, "Positive", "Negative/Normal"),
+                           levels = c("Negative/Normal", "Positive")),
+
+    # Age (continuous and categorical)
+    age = age_at_biopsy,
+    age_group = factor(
+      case_when(
+        age_at_biopsy < 30 ~ "<30",
+        age_at_biopsy < 50 ~ "30-49",
+        age_at_biopsy >= 50 ~ "≥50"
+      ),
+      levels = c("<30", "30-49", "≥50")
+    ),
+
+    # Sex (using female_gender from ETL)
+    sex_f = factor(female_gender, levels = c("Male", "Female")),
+
+    # Diabetes (HbA1c >= 6.5%)
+    diabetes = factor(ifelse(hb_a1c_percent_at_biopsy >= 6.5, "Yes", "No"),
+                     levels = c("No", "Yes")),
+
+    # Time to biopsy (log transform due to skewness)
+    time_to_biopsy = time_to_biopsy_from_lupus_nephritis_suspicion_days,
+    log_time_to_biopsy = log(time_to_biopsy + 1)
+  )
+
+# Check outcome distribution
+table(d_reg$rrt_outcome, useNA = "always")
+```
+
+## Summary Statistics by RRT Outcome
+
+```{r}
+#| label: tbl-descriptive-by-rrt
+
+d_reg |>
+  select(
+    rrt_outcome,
+    age,
+    sex_f,
+    indigenous,
+    ckd_stage_cat,
+    uacr_cat,
+    proliferative,
+    hemoglobin,
+    c3_low_factor,
+    c4_low_factor,
+    dsdna_positive
+  ) |>
+  tbl_summary(
+    by = rrt_outcome,
+    label = list(
+      age ~ "Age (years)",
+      sex_f ~ "Sex",
+      indigenous ~ "Indigenous Status",
+      ckd_stage_cat ~ "CKD Stage",
+      uacr_cat ~ "UACR Category",
+      proliferative ~ "Proliferative Disease",
+      hemoglobin ~ "Hemoglobin (g/L)",
+      c3_low_factor ~ "C3 Level",
+      c4_low_factor ~ "C4 Level",
+      dsdna_positive ~ "Anti-dsDNA"
+    ),
+    statistic = list(
+      all_continuous() ~ "{median} ({p25}, {p75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(
+      all_continuous() ~ 1,
+      all_categorical() ~ c(0, 1)
+    ),
+    missing = "no"
+  ) |>
+  add_overall() |>
+  add_p() |>
+  modify_caption("**Table 1. Baseline Characteristics by Permanent RRT Outcome**") |>
+  bold_labels()
+```
+
+## Univariate Logistic Regression Analysis
+
+```{r}
+#| label: tbl-univariate
+
+d_reg |>
+  select(
+    rrt_outcome,
+    age,
+    sex_f,
+    indigenous,
+    ckd_stage,
+    ckd_advanced,
+    uacr_cat,
+    proliferative,
+    class_IV,
+    class_V,
+    pure_vs_mixed,
+    hemoglobin,
+    anemia,
+    c3_low_factor,
+    c4_low_factor,
+    dsdna_positive,
+    diabetes,
+    log_time_to_biopsy
+  ) |>
+  tbl_uvregression(
+    method = glm,
+    y = rrt_outcome,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    label = list(
+      age ~ "Age (per year)",
+      sex_f ~ "Sex",
+      indigenous ~ "Indigenous Status",
+      ckd_stage ~ "CKD Stage (per stage increase)",
+      ckd_advanced ~ "Advanced CKD",
+      uacr_cat ~ "UACR Category",
+      proliferative ~ "Proliferative Disease (III/IV)",
+      class_IV ~ "ISN/RPS Class IV",
+      class_V ~ "ISN/RPS Class V",
+      pure_vs_mixed ~ "Pure vs Mixed Class",
+      hemoglobin ~ "Hemoglobin (per g/L)",
+      anemia ~ "Anemia (<120 g/L)",
+      c3_low_factor ~ "Low C3",
+      c4_low_factor ~ "Low C4",
+      dsdna_positive ~ "Anti-dsDNA Positive",
+      diabetes ~ "Diabetes (HbA1c ≥6.5%)",
+      log_time_to_biopsy ~ "Time to Biopsy (log days)"
+    ),
+    hide_n = TRUE,
+    missing = "no"
+  ) |>
+  modify_caption("**Table 2. Univariate Logistic Regression - Predictors of Permanent RRT**") |>
+  bold_labels() |>
+  bold_p(t = 0.05)
+```
+
+## Multivariable Logistic Regression Models
+
+### Model 1: Core Predictors (CKD Stage + Indigenous Status + Proliferative)
+
+```{r}
+#| label: tbl-model1
+
+# Build model
+model1 <- glm(
+  rrt_outcome ~ ckd_stage + indigenous + proliferative,
+  data = d_reg,
+  family = binomial
+)
+
+# Present results
+tbl_regression(
+  model1,
+  exponentiate = TRUE,
+  label = list(
+    ckd_stage ~ "CKD Stage (per stage increase)",
+    indigenous ~ "Indigenous Status",
+    proliferative ~ "Proliferative Disease (III/IV)"
+  )
+) |>
+  add_glance_table(
+    include = c(nobs, logLik, AIC)
+  ) |>
+  modify_caption("**Table 3. Model 1: Core Predictors of Permanent RRT**") |>
+  bold_labels() |>
+  bold_p(t = 0.05)
+```
+
+### Model 2: Core Predictors + Proteinuria
+
+```{r}
+#| label: tbl-model2
+
+# Build model
+model2 <- glm(
+  rrt_outcome ~ ckd_stage + indigenous + proliferative + uacr_cat,
+  data = d_reg,
+  family = binomial
+)
+
+# Present results
+tbl_regression(
+  model2,
+  exponentiate = TRUE,
+  label = list(
+    ckd_stage ~ "CKD Stage (per stage increase)",
+    indigenous ~ "Indigenous Status",
+    proliferative ~ "Proliferative Disease (III/IV)",
+    uacr_cat ~ "UACR Category"
+  )
+) |>
+  add_glance_table(
+    include = c(nobs, logLik, AIC)
+  ) |>
+  modify_caption("**Table 4. Model 2: Core Predictors + Proteinuria**") |>
+  bold_labels() |>
+  bold_p(t = 0.05)
+```
+
+### Model 3: Alternative - Advanced CKD Dichotomized
+
+```{r}
+#| label: tbl-model3
+
+# Build model
+model3 <- glm(
+  rrt_outcome ~ ckd_advanced + indigenous + proliferative + uacr_cat,
+  data = d_reg,
+  family = binomial
+)
+
+# Present results
+tbl_regression(
+  model3,
+  exponentiate = TRUE,
+  label = list(
+    ckd_advanced ~ "Advanced CKD (3-5 vs 1-2)",
+    indigenous ~ "Indigenous Status",
+    proliferative ~ "Proliferative Disease (III/IV)",
+    uacr_cat ~ "UACR Category"
+  )
+) |>
+  add_glance_table(
+    include = c(nobs, logLik, AIC)
+  ) |>
+  modify_caption("**Table 5. Model 3: Alternative Specification (CKD Dichotomized)**") |>
+  bold_labels() |>
+  bold_p(t = 0.05)
+```
+
+## Model Comparison
+
+```{r}
+#| label: tbl-model-comparison
+
+tbl_merge(
+  list(
+    tbl_regression(model1, exponentiate = TRUE),
+    tbl_regression(model2, exponentiate = TRUE),
+    tbl_regression(model3, exponentiate = TRUE)
+  ),
+  tab_spanner = c("**Model 1**", "**Model 2**", "**Model 3**")
+) |>
+  modify_caption("**Table 6. Model Comparison**") |>
+  bold_labels()
+```
+
+## Model Diagnostics
+
+```{r}
+#| label: model-diagnostics
+
+# Create model performance summary table
+model_performance <- data.frame(
+  Model = c("Model 1: Core predictors",
+            "Model 2: Core + Proteinuria",
+            "Model 3: CKD dichotomized"),
+  N = c(nobs(model1), nobs(model2), nobs(model3)),
+  AIC = c(AIC(model1), AIC(model2), AIC(model3)),
+  BIC = c(BIC(model1), BIC(model2), BIC(model3)),
+  Deviance = c(deviance(model1), deviance(model2), deviance(model3))
+)
+
+knitr::kable(
+  model_performance,
+  digits = 2,
+  caption = "**Table 7. Model Performance Metrics**"
+)
+```
+
+## Missing Data Summary
+
+```{r}
+#| label: tbl-missing
+
+d_reg |>
+  select(
+    rrt_outcome,
+    ckd_stage,
+    indigenous,
+    proliferative,
+    uacr_cat,
+    hemoglobin,
+    c3_low_factor,
+    c4_low_factor,
+    dsdna_positive
+  ) |>
+  tbl_summary(
+    type = all_categorical() ~ "categorical",
+    statistic = all_categorical() ~ "{N_miss} ({p_miss}%)",
+    label = list(
+      rrt_outcome ~ "Permanent RRT",
+      ckd_stage ~ "CKD Stage",
+      indigenous ~ "Indigenous Status",
+      proliferative ~ "Proliferative Disease",
+      uacr_cat ~ "UACR Category",
+      hemoglobin ~ "Hemoglobin",
+      c3_low_factor ~ "C3 Level",
+      c4_low_factor ~ "C4 Level",
+      dsdna_positive ~ "Anti-dsDNA"
+    )
+  ) |>
+  modify_caption("**Table 8. Missing Data Summary**") |>
+  bold_labels()
+```

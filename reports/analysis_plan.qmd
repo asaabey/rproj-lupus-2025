@@ -1,0 +1,70 @@
+---
+title: "Lupus Nephritis Analysis Plan"
+author: "NTG Lupus Study Team"
+date: today
+format: html
+---
+
+## Dataset Overview
+
+**123 patients × 42 variables** with lupus nephritis data including:
+
+- Demographics (age, sex, ethnicity, community)
+- Clinical (creatinine, eGFR, proteinuria, haematuria, CKD stage)
+- Lab values (Hb, platelets, HbA1c, complement C3/C4)
+- Serology (ANA, ds-DNA, ANCA, antiphospholipid antibodies)
+- Histology (ISN/RPS class)
+- Outcomes (ESKD, permanent RRT, mortality, transplant)
+
+## Analysis Plan
+
+### 1. Descriptive Statistics
+
+- Demographic profile (age, sex distribution, ethnicity breakdown)
+- Clinical presentation at biopsy (median creatinine, eGFR, proteinuria)
+- Distribution of ISN/RPS histological classes
+- Prevalence of serological markers
+
+### 2. Indigenous vs Non-Indigenous Comparison
+
+*Highly relevant given the Australian Indigenous literature findings*
+
+- Compare baseline characteristics
+- Compare outcomes (ESKD, RRT, mortality)
+- Time to biopsy differences
+
+### 3. Outcome Analysis
+
+**Primary outcomes:**
+
+- ESKD (eGFR <15)
+- Permanent RRT
+- Mortality
+
+**Key predictors to test (from literature):**
+
+- Ethnicity (Indigenous status)
+- Serum creatinine at biopsy
+- Proteinuria (u_acr_at_biopsy)
+- Anemia (Hb)
+- Thrombocytopenia (plt)
+- Low complement (C3, C4)
+- Histological class (especially Class IV)
+- Time to biopsy
+
+### 4. Histological Class Analysis
+
+- Distribution of ISN/RPS classes
+- Outcomes by class (Class IV vs others)
+- Class switching (for repeat biopsies)
+
+### 5. Prognostic Modeling
+
+- Univariate analysis of risk factors for each outcome
+- Multivariate logistic regression for ESKD/mortality
+- Consider Kaplan-Meier survival analysis if time-to-event data available
+
+### 6. Serological Patterns
+
+- Association of anti-dsDNA, complement levels with disease severity
+- Antiphospholipid antibody prevalence and outcomes

@@ -11,8 +11,7 @@ renv/staging/
 
 # Data files (may contain sensitive information)
 data/
-reports/
-resources/
+
 
 # Analysis outputs
 *.txt

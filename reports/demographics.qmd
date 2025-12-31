@@ -1,0 +1,50 @@
+---
+title: "Demographics Summary"
+format: html
+editor: visual
+---
+
+## Demographic Characteristics
+
+This table presents demographic information from the lupus research dataset.
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(dplyr)
+library(gtsummary)
+```
+
+```{r}
+#| label: load-data
+
+# Load the working dataset
+d1 <- rio::import("../data/stage1.rds")
+```
+
+```{r}
+#| label: demographics-table
+
+# Select demographic variables
+demographics <- d1 %>%
+  select(
+    sex,
+    age_at_biopsy
+  )
+
+# Create gtsummary table stratified by sex
+demographics %>%
+  tbl_summary(
+    by = sex,
+    label = list(
+      age_at_biopsy ~ "Age at Biopsy"
+    ),
+    missing = "no"
+  ) %>%
+  add_overall() %>%
+  add_p() %>%
+  modify_caption("**Table 1. Demographic Characteristics by Sex**") %>%
+  bold_labels()
+```

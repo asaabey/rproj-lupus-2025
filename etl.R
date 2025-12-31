@@ -8,7 +8,7 @@ setwd("/mnt/readynas/ntg-jolghazi-lupus-2025/")
 
 # stop at row 125
 # Load excel ----
-d0 <- rio::import("data/Lupus Research 7 with Data Dictionary.xlsx", sheet = "Main", skip = 1, n_max = 123) %>% janitor::clean_names()
+d0 <- rio::import("data/Lupus Research 7 with Data Dictionary.xlsx", sheet = "Main", skip = 1, n_max = 135) %>% janitor::clean_names()
 
 
 
@@ -62,13 +62,13 @@ d0 <- d0 %>%
 # create a new variable called indigenous_status using ethnicity
 d0 <- d0 %>%
   mutate(
-    indigenous_status = if_else(ethnicity == "Aboriginal","Indigenous","Non-Indigenous")
+    indigenous_status = if_else(ethnicity == "Aboriginal",TRUE,FALSE)
   )
 
 # create female_gender variable from sex
 d0 <- d0 %>%
   mutate(
-    female_gender = if_else(sex == "F", "Female", "Male")
+    female_gender = if_else(sex == "F", TRUE, FALSE)
   )
 
 # create remoteness variable from community
@@ -205,6 +205,12 @@ d0 <- d0 %>%
     )
   )
 
-# Save cleaned data ----
 d0 %>%  rio::export("data/stage1.rds")
+
+d0 <- d0 %>%
+  filter(presentation_rank==1)
+
+d0 %>%  rio::export("data/stage2.rds")
+# Save cleaned data ----
+
 
