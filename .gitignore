@@ -1,0 +1,18 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# renv library (restored from renv.lock)
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+
+# Data files (may contain sensitive information)
+data/
+reports/
+resources/
+
+# Analysis outputs
+*.txt
